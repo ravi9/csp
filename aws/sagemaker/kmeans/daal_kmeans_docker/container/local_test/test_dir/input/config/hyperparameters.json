@@ -1,0 +1,12 @@
+{
+"nClusters" : 10,
+"maxIterations" : 50,
+"initialCentroidMethod" : "plusPlusDense",
+"method" : "defaultDense",
+"oversamplingFactor" : 0.5,
+"nRounds" : 5,
+"accuracyThreshold" : 0.0001,
+"gamma" : 1.0,
+"distanceType" : "euclidean",
+"assignFlag" : true 
+}
