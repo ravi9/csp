@@ -31,5 +31,9 @@ sudo yum -y install openmpi openmpi-devel
 grep -q '^StrictHostKeyChecking no' /etc/ssh/ssh_config || printf '\nStrictHostKeyChecking no\nUserKnownHostsFile /dev/null\n' > /etc/ssh/ssh_config
 [ -d /mnt/resource ] && chmod 777 /mnt/resource
 
+touch /mnt/resource/iamhere
+cd /mnt/resource/
+wget https://raw.githubusercontent.com/MattsonThieme/dl-containers/master/Singularity/template.singularity
+
 echo "$0 Completed"
 
