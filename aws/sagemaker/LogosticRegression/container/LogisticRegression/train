@@ -1,0 +1,142 @@
+#!/usr/bin/env python
+
+# A sample training component that trains a simple scikit-learn decision tree model.
+# This implementation works in File mode and makes no assumptions about the input file names.
+# Input is specified as CSV with a data point in each row and the labels in the first column.
+
+from __future__ import print_function
+
+import os
+import json
+import pickle
+import sys
+import traceback
+from pprint import pprint, pformat
+
+import pandas as pd
+import numpy as np
+import time
+from LogisticRegression import LogisticRegression
+from daal.data_management import HomogenNumericTable, BlockDescriptor_Float32, readOnly
+
+import logging
+
+logging.basicConfig(
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
+   
+logger = logging.getLogger(__name__)
+
+
+# These are the paths to where SageMaker mounts interesting things in your container.
+prefix = '/opt/ml/'
+
+input_path = prefix + 'input/data'
+output_path = os.path.join(prefix, 'output')
+model_path = os.path.join(prefix, 'model')
+param_path = os.path.join(prefix, 'input/config/hyperparameters.json')
+
+# This algorithm has a single channel of input data called 'training'. Since we run in
+# File mode, the input files are copied to the directory specified here.
+channel_name='training'
+training_path = os.path.join(input_path, channel_name)
+
+# The function to execute the training.
+def train():
+    logger.info('Container setup completed, In Docker entrypoint - train... ')
+    
+    try:
+        # Default Paramaters         
+        params = {}
+        params['nClasses'] = 2
+        params['penaltyL1'] = 0
+        params['penaltyL2'] = 0
+                
+        logger.info("Default Hyperparameters loaded: ")
+        logger.info(pformat(params))
+        
+        # Read in any hyperparameters that the user passed with the training job
+        
+        with open(param_path, 'r') as tc:
+            trainingParams = json.load(tc)
+            
+        for param in trainingParams:
+            params[param] = trainingParams[param]
+        
+        logger.info("Updated with user hyperparameters, Final Hyperparameters: ")
+        logger.info(pformat(params))
+        
+        logger.info("Reading training data... ")
+        
+        # Take the set of files and read them all into a single pandas dataframe
+        input_files = [ os.path.join(training_path, file) for file in os.listdir(training_path) ]
+        if len(input_files) == 0:
+            raise ValueError(('There are no files in {}.\n' +
+                              'This usually indicates that the channel ({}) was incorrectly specified,\n' +
+                              'the data specification in S3 was incorrectly specified or the role specified\n' +
+                              'does not have permission to access the data.').format(training_path, channel_name))
+        raw_data = [ pd.read_csv(file, header=None) for file in input_files ]
+        train_data = pd.concat(raw_data)
+        
+        logger.info("Training Data Shape: " + str(train_data.shape))
+        
+        X = np.ascontiguousarray(train_data, dtype=np.float32)
+        train_data_NT = HomogenNumericTable(X[:,:-1])
+        labels_NT = HomogenNumericTable(X[:,-1].reshape(len(X),1))
+        
+        # Here we only support a single hyperparameter. Note that hyperparameters are always passed in as
+        # strings, so we need to do any necessary conversions
+
+        # Now use DAAL's Kmeans to train the model.
+        
+        logger.info('Starting DAAL Logistic Regression training...')
+        nClasses = int(params['nClasses'])
+        logistic_regression = LogisticRegression(
+                                                 nClasses=nClasses,
+                                                 penaltyL1=int(params['penaltyL1']),
+                                                 penaltyL2=int(params['penaltyL2'])
+                                                 )
+        start = time.time()
+        logistic_regression.train(data=train_data_NT, labels=labels_NT)
+        end = time.time()
+        logger.info("Training time in sec = " + str(end - start))
+        #beta_res = trainingResult.betaResult
+        result_buffer = np.append(logistic_regression.serializeTrainingResult(), nClasses)
+        #print(result_buffer)
+        # save the model
+
+        with open(os.path.join(model_path, 'daal-log-reg-train-result.npy'), 'wb') as out_path:
+            np.save(out_path, result_buffer)
+            logger.info('Model saved at ' + str(out_path))
+       
+      
+    except Exception as e:
+        # Write out an error file. This will be returned as the failureReason in the
+        # DescribeTrainingJob result.
+        trc = traceback.format_exc()
+        with open(os.path.join(output_path, 'failure'), 'w') as s:
+            s.write('Exception during training: ' + str(e) + '\n' + trc)
+        # Printing this causes the exception to be in the training job logs, as well.
+        print('Exception during training: ' + str(e) + '\n' + trc, file=sys.stderr)
+        # A non-zero exit code causes the training job to be marked as Failed.
+        sys.exit(255)
+        
+def getArrayFromNT(table, nrows=0):
+    bd = BlockDescriptor_Float32()
+    if nrows == 0:
+        nrows = table.getNumberOfRows()
+    table.getBlockOfRows(0, nrows, readOnly, bd)
+    npa = bd.getArray()
+    table.releaseBlockOfRows(bd)
+    return npa
+
+def printNT(table, nrows = 0, message=''):
+    npa = getArrayFromNT(table, nrows)
+    print(message, '\n', npa)
+    
+if __name__ == '__main__':
+    train()
+
+    # A zero exit code causes the job to be marked a Succeeded.
+    sys.exit(0)
