@@ -6,7 +6,7 @@ from __future__ import print_function
 import os
 import json
 import pickle
-import StringIO
+from io import StringIO
 import sys
 import signal
 import traceback
@@ -16,9 +16,7 @@ import flask
 import pandas as pd
 import numpy as np
 from LogisticRegression import LogisticRegression
-from daal.data_management import HomogenNumericTable, BlockDescriptor_Float32, readOnly
-from daal.algorithms import classifier
-from daal.algorithms.logistic_regression import prediction, training
+
 prefix = '/opt/ml/'
 model_path = os.path.join(prefix, 'model')
 
@@ -32,21 +30,18 @@ class ScoringService(object):
     def get_model(cls):
         """Get the model object for this instance, loading it if it's not already loaded."""
         if cls.model == None:
-            with open(os.path.join(model_path, 'daal-log-reg-train-result.npy'), 'rb') as inp:
-                buffer = np.load(inp, encoding='latin1')
-                cls.logistic_regression = LogisticRegression(buffer[-1])
-                cls.model = cls.logistic_regression.deserializeTrainingResult(np.ubyte(buffer[:-1])).get(classifier.training.model)
+            with open(os.path.join(model_path, 'daal-log-reg-train-model.pkl'), 'rb') as inp:
+                cls.model = pickle.load(inp)
         return cls.model
 
     @classmethod
     def predict(cls, input):
-        """For the input, do the predictions and return them.
-
-        Args:
-            input (a pandas dataframe): The data on which to do the predictions. There will be
-                one prediction per row in the dataframe"""
+        """For the input, do the predictions and return them."""
         model = cls.get_model()
-        return cls.logistic_regression.predict(input, model).prediction
+        with open(os.path.join(model_path, 'daal-log-reg-train-classes.npy'), 'rb') as inp:
+            nClasses = np.load(inp, encoding='latin1')
+        logistic_regression = LogisticRegression(nClasses)
+        return logistic_regression.predict(predict_data=input, model=model).prediction
 
 # The flask app for serving predictions
 app = flask.Flask(__name__)
@@ -71,7 +66,7 @@ def transformation():
     # Convert from CSV to pandas
     if flask.request.content_type == 'text/csv':
         data = flask.request.data.decode('utf-8')
-        s = StringIO.StringIO(data)
+        s = StringIO(data)
         data = pd.read_csv(s, header=None)
     else:
         return flask.Response(response='This predictor only supports CSV data', status=415, mimetype='text/plain')
@@ -81,26 +76,14 @@ def transformation():
     #train_data = pd.concat(raw_data)
         
     #logger.info("Training Data Shape: " + str(train_data.shape))
-        
-    X = np.ascontiguousarray(data, dtype=np.float32)
-    test_data_NT = HomogenNumericTable(X)
-        
+
     # Do the prediction
-    predictions = getArrayFromNT(ScoringService.predict(test_data_NT))
+    predictions = ScoringService.predict(input=np.ascontiguousarray(data, dtype=np.float32))
 
     # Convert from numpy back to CSV
-    out = StringIO.StringIO()
+    out = StringIO()
     #pd.DataFrame({'results':predictions}).to_csv(out, header=False, index=False)
     #result = out.getvalue()
     np.savetxt(out, predictions)
     result = out.getvalue()
     return flask.Response(response=result, status=200, mimetype='text/csv')
-
-def getArrayFromNT(table, nrows=0):
-    bd = BlockDescriptor_Float32()
-    if nrows == 0:
-        nrows = table.getNumberOfRows()
-    table.getBlockOfRows(0, nrows, readOnly, bd)
-    npa = bd.getArray()
-    table.releaseBlockOfRows(bd)
-    return npa

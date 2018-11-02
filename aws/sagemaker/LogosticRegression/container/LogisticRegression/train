@@ -17,7 +17,6 @@ import pandas as pd
 import numpy as np
 import time
 from LogisticRegression import LogisticRegression
-from daal.data_management import HomogenNumericTable, BlockDescriptor_Float32, readOnly
 
 import logging
 
@@ -52,6 +51,8 @@ def train():
         params['nClasses'] = 2
         params['penaltyL1'] = 0
         params['penaltyL2'] = 0
+        params['interceptFlag'] = True
+        params['dtype'] = "float"
                 
         logger.info("Default Hyperparameters loaded: ")
         logger.info(pformat(params))
@@ -82,8 +83,8 @@ def train():
         logger.info("Training Data Shape: " + str(train_data.shape))
         
         X = np.ascontiguousarray(train_data, dtype=np.float32)
-        train_data_NT = HomogenNumericTable(X[:,:-1])
-        labels_NT = HomogenNumericTable(X[:,-1].reshape(len(X),1))
+        train_data = X[:,:-1]
+        labels = X[:,-1].reshape(len(X),1)
         
         # Here we only support a single hyperparameter. Note that hyperparameters are always passed in as
         # strings, so we need to do any necessary conversions
@@ -95,21 +96,24 @@ def train():
         logistic_regression = LogisticRegression(
                                                  nClasses=nClasses,
                                                  penaltyL1=int(params['penaltyL1']),
-                                                 penaltyL2=int(params['penaltyL2'])
+                                                 penaltyL2=int(params['penaltyL2']),
+                                                 interceptFlag = params['interceptFlag'],
+                                                 dtype = params['dtype']
                                                  )
         start = time.time()
-        logistic_regression.train(data=train_data_NT, labels=labels_NT)
+        logistic_regression.train(train_data=train_data, train_labels=labels)
         end = time.time()
         logger.info("Training time in sec = " + str(end - start))
-        #beta_res = trainingResult.betaResult
-        result_buffer = np.append(logistic_regression.serializeTrainingResult(), nClasses)
-        #print(result_buffer)
+
+        result_buffer = nClasses
         # save the model
 
-        with open(os.path.join(model_path, 'daal-log-reg-train-result.npy'), 'wb') as out_path:
+        with open(os.path.join(model_path, 'daal-log-reg-train-classes.npy'), 'wb') as out_path:
             np.save(out_path, result_buffer)
+            logger.info('number of classes saved at ' + str(out_path))
+        with open(os.path.join(model_path, 'daal-log-reg-train-model.pkl'), 'wb') as out_path:
+            pickle.dump(logistic_regression.trainingResult.model, out_path)
             logger.info('Model saved at ' + str(out_path))
-       
       
     except Exception as e:
         # Write out an error file. This will be returned as the failureReason in the
@@ -121,15 +125,6 @@ def train():
         print('Exception during training: ' + str(e) + '\n' + trc, file=sys.stderr)
         # A non-zero exit code causes the training job to be marked as Failed.
         sys.exit(255)
-        
-def getArrayFromNT(table, nrows=0):
-    bd = BlockDescriptor_Float32()
-    if nrows == 0:
-        nrows = table.getNumberOfRows()
-    table.getBlockOfRows(0, nrows, readOnly, bd)
-    npa = bd.getArray()
-    table.releaseBlockOfRows(bd)
-    return npa
 
 def printNT(table, nrows = 0, message=''):
     npa = getArrayFromNT(table, nrows)
