@@ -1,5 +1,15 @@
 {
-"nClasses" : 3,
-"penaltyL1" : 0,
-"penaltyL2" : 0
+    "nClasses": 3,
+    "penaltyL1": 0,
+    "penaltyL2": 0,
+    "interceptFlag": false,
+    "solver": 
+    {
+        "name": "sgd",
+        "method": "momentum", 
+        "maxIterations": 1000,
+        "learningRate": 0.001,
+        "accuracyThreshold": 0.0001,
+        "batchSize": 150
+    }
 }

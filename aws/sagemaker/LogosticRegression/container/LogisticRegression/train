@@ -53,23 +53,25 @@ def train():
         params['penaltyL2'] = 0
         params['interceptFlag'] = True
         params['dtype'] = "float"
-                
+
         logger.info("Default Hyperparameters loaded: ")
         logger.info(pformat(params))
-        
+
         # Read in any hyperparameters that the user passed with the training job
-        
+
         with open(param_path, 'r') as tc:
             trainingParams = json.load(tc)
-            
+        customSolver = False
         for param in trainingParams:
             params[param] = trainingParams[param]
-        
+            if param == "solver":
+                customSolver = True
+
         logger.info("Updated with user hyperparameters, Final Hyperparameters: ")
         logger.info(pformat(params))
-        
+
         logger.info("Reading training data... ")
-        
+
         # Take the set of files and read them all into a single pandas dataframe
         input_files = [ os.path.join(training_path, file) for file in os.listdir(training_path) ]
         if len(input_files) == 0:
@@ -79,18 +81,34 @@ def train():
                               'does not have permission to access the data.').format(training_path, channel_name))
         raw_data = [ pd.read_csv(file, header=None) for file in input_files ]
         train_data = pd.concat(raw_data)
-        
+
         logger.info("Training Data Shape: " + str(train_data.shape))
-        
+
         X = np.ascontiguousarray(train_data, dtype=np.float32)
         train_data = X[:,:-1]
         labels = X[:,-1].reshape(len(X),1)
-        
+
+        #print(trainingParams["solver"]["accuracyThreshold"])
+        solverParams = {}
+        solverParams['name'] = ""
+        solverParams['method'] = "defaultDense"
+        solverParams['maxIterations'] = 1000
+        solverParams['learningRate'] = 0.001
+        solverParams['stepLength'] = 0.001
+        solverParams['accuracyThreshold'] = 0.0001
+        solverParams['batchSize'] = train_data.shape[0]
+        solverParams['correctionPairBatchSize'] = train_data.shape[0]
+        solverParams['L'] = 1
+
+        if customSolver is True:
+            for sParam in trainingParams['solver']:
+                solverParams[sParam] = trainingParams['solver'][sParam]
+
         # Here we only support a single hyperparameter. Note that hyperparameters are always passed in as
         # strings, so we need to do any necessary conversions
 
-        # Now use DAAL's Kmeans to train the model.
-        
+        # Now use DAAL's Logistic Regression to train the model.
+
         logger.info('Starting DAAL Logistic Regression training...')
         nClasses = int(params['nClasses'])
         logistic_regression = LogisticRegression(
@@ -98,8 +116,9 @@ def train():
                                                  penaltyL1=int(params['penaltyL1']),
                                                  penaltyL2=int(params['penaltyL2']),
                                                  interceptFlag = params['interceptFlag'],
-                                                 dtype = params['dtype']
-                                                 )
+                                                 dtype = params['dtype'],
+                                                 optSolverParam = solverParams
+                                                )
         start = time.time()
         logistic_regression.train(train_data=train_data, train_labels=labels)
         end = time.time()
@@ -114,7 +133,7 @@ def train():
         with open(os.path.join(model_path, 'daal-log-reg-train-model.pkl'), 'wb') as out_path:
             pickle.dump(logistic_regression.trainingResult.model, out_path)
             logger.info('Model saved at ' + str(out_path))
-      
+
     except Exception as e:
         # Write out an error file. This will be returned as the failureReason in the
         # DescribeTrainingJob result.
@@ -129,7 +148,7 @@ def train():
 def printNT(table, nrows = 0, message=''):
     npa = getArrayFromNT(table, nrows)
     print(message, '\n', npa)
-    
+
 if __name__ == '__main__':
     train()
 
