@@ -1,0 +1,8 @@
+Exception during training: Parameter 'bootstrap' is incompatible with requested OOB result (no out-of-bag observations)
+
+Traceback (most recent call last):
+  File "/opt/program/train", line 109, in train
+    result = daal_df.compute(train_X, train_y)
+  File "build/daal4py_cy.pyx", line 6614, in _daal4py.decision_forest_classification_training.compute
+RuntimeError: Parameter 'bootstrap' is incompatible with requested OOB result (no out-of-bag observations)
+
