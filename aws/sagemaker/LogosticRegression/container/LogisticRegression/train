@@ -59,14 +59,6 @@ def train():
 
         # Read in any hyperparameters that the user passed with the training job
 
-        with open(param_path, 'r') as tc:
-            trainingParams = json.load(tc)
-        customSolver = False
-        for param in trainingParams:
-            params[param] = trainingParams[param]
-            if param == "solver":
-                customSolver = True
-
         logger.info("Updated with user hyperparameters, Final Hyperparameters: ")
         logger.info(pformat(params))
 
@@ -88,22 +80,28 @@ def train():
         train_data = X[:,:-1]
         labels = X[:,-1].reshape(len(X),1)
 
-        #print(trainingParams["solver"]["accuracyThreshold"])
         solverParams = {}
-        solverParams['name'] = ""
-        solverParams['method'] = "defaultDense"
-        solverParams['maxIterations'] = 1000
-        solverParams['learningRate'] = 0.001
-        solverParams['stepLength'] = 0.001
-        solverParams['accuracyThreshold'] = 0.0001
-        solverParams['batchSize'] = train_data.shape[0]
-        solverParams['correctionPairBatchSize'] = train_data.shape[0]
-        solverParams['L'] = 1
-
-        if customSolver is True:
-            for sParam in trainingParams['solver']:
-                solverParams[sParam] = trainingParams['solver'][sParam]
-
+        solverParams['solverName'] = ""
+        solverParams['solverMethod'] = "defaultDense"
+        solverParams['solverMaxIterations'] = 1000
+        solverParams['solverLearningRate'] = 0.001
+        solverParams['solverStepLength'] = 0.001
+        solverParams['solverAccuracyThreshold'] = 0.0001
+        solverParams['solverBatchSize'] = train_data.shape[0]
+        solverParams['solverCorrectionPairBatchSize'] = train_data.shape[0]
+        solverParams['solverL'] = 1
+                
+        with open(param_path, 'r') as tc:
+            trainingParams = json.load(tc)
+        for param in trainingParams:
+            #logger.info("###param: " + str(param))
+            if "solver" in param:
+                solverParams[param] = trainingParams[param]
+                #logger.info("###solverParams[param]: " + str(solverParams[param]))
+            else:
+                params[param] = trainingParams[param]
+        logger.info("Updated with user hyperparameters, Final Hyperparameters: ")
+        logger.info(pformat(params))
         # Here we only support a single hyperparameter. Note that hyperparameters are always passed in as
         # strings, so we need to do any necessary conversions
 
@@ -113,8 +111,8 @@ def train():
         nClasses = int(params['nClasses'])
         logistic_regression = LogisticRegression(
                                                  nClasses=nClasses,
-                                                 penaltyL1=int(params['penaltyL1']),
-                                                 penaltyL2=int(params['penaltyL2']),
+                                                 penaltyL1=float(params['penaltyL1']),
+                                                 penaltyL2=float(params['penaltyL2']),
                                                  interceptFlag = params['interceptFlag'],
                                                  dtype = params['dtype'],
                                                  optSolverParam = solverParams

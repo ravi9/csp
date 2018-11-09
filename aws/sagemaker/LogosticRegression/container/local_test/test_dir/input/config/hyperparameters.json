@@ -3,13 +3,10 @@
     "penaltyL1": 0,
     "penaltyL2": 0,
     "interceptFlag": false,
-    "solver": 
-    {
-        "name": "sgd",
-        "method": "momentum", 
-        "maxIterations": 1000,
-        "learningRate": 0.001,
-        "accuracyThreshold": 0.0001,
-        "batchSize": 150
-    }
+    "solverName": "sgd",
+    "solverMethod": "momentum", 
+    "solverMaxIterations": 1000,
+    "solverLearningRate": 0.001,
+    "solverAccuracyThreshold": 0.0001,
+    "solverBatchSize": 150
 }
