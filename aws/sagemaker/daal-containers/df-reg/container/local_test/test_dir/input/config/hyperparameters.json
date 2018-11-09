@@ -1,0 +1,6 @@
+{
+"nTrees":100, 
+"varImportance":"MDA_Raw", 
+"bootstrap":"True", 
+"resultsToCompute":"computeOutOfBagError|computeOutOfBagErrorPerObservation"
+}

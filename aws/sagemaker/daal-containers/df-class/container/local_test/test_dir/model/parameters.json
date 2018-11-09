@@ -1,0 +1,1 @@
+{"fptype": "double", "method": "defaultDense", "nTrees": "100", "observationsPerTreeFraction": "1", "featuresPerNode": "0", "maxTreeDepth": "0", "minObservationsInLeafNode": "1", "seed": "777", "impurityThreshold": "0", "varImportance": "None", "resultsToCompute": "computeOutOfBagError", "memorySavingMode": "False", "bootstrap": "True", "distributed": "False", "nClasses": 5}

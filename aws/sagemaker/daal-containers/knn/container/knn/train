@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+import os
+import json
+import sys
+import traceback
+from pprint import pformat
+import numpy as np
+import time
+import pickle
+from daal4py import kdtree_knn_classification_training
+
+import logging
+
+logging.basicConfig(
+	format='%(asctime)s %(levelname)-8s %(message)s',
+	level=logging.INFO,
+	datefmt='%Y-%m-%d %H:%M:%S')
+
+logger = logging.getLogger(__name__)
+
+# These are the paths to where SageMaker mounts interesting things in your container.
+prefix = '/opt/ml/'
+
+input_path = prefix + 'input/data'
+output_path = os.path.join(prefix, 'output')
+model_path = os.path.join(prefix, 'model')
+param_path = os.path.join(prefix, 'input/config/hyperparameters.json')
+
+# This algorithm has a single channel of input data called 'training'. Since we run in
+# File mode, the input files are copied to the directory specified here.
+channel_name='training'
+training_path = os.path.join(input_path, channel_name)
+
+
+# The function to execute the training.
+def train():
+	logger.info('Container setup completed, In Docker entrypoint - train... ')
+
+	try:
+		# Default Paramaters         
+		params = {
+			"fptype":"double",
+			"method":"defaultDense",
+			"dataUseInModel":"doNotUse",
+			"k":"1",
+			"distributed":"False"
+		}
+		logger.info("Default Hyperparameters loaded: ")
+		logger.info("\n"+pformat(params))
+
+		# Read in any hyperparameters that the user passed with the training job
+
+		with open(param_path, 'r') as tc:
+			loaded_params = json.load(tc)
+
+		params.update(loaded_params)
+
+		logger.info("Updated with user hyperparameters, Final Hyperparameters: ")
+		logger.info("\n"+pformat(params))
+
+		logger.info("Reading training data... ")
+
+		input_files = [os.path.join(training_path, file) for file in os.listdir(training_path)]
+		if len(input_files) == 0:
+			raise ValueError(('There are no files in {}.\n' +
+							  'This usually indicates that the channel ({}) was incorrectly specified,\n' +
+							  'the data specification in S3 was incorrectly specified or the role specified\n' +
+							  'does not have permission to access the data.').format(training_path, channel_name))
+
+		raw_data = [np.genfromtxt(file, delimiter=",") for file in input_files]
+		train_data = np.concatenate(raw_data)
+		# labels are in the first column
+		train_y=train_data[:,0]
+		train_y = train_y[:, np.newaxis]
+		train_X = train_data[:,1:]
+		logger.info("Training Data Shape: " + str(train_data.shape))
+
+		daal_knn = kdtree_knn_classification_training(nClasses=int(params["nClasses"]),
+			fptype=params["fptype"], 
+			method=params["method"],
+			dataUseInModel=params["dataUseInModel"],
+			k=int(params["k"]),
+			distributed=(True if params["distributed"] == "True" else False)
+		)
+		
+		logger.info('Starting DAAL KNN Kdtree training...')
+
+		start = time.time()
+		result = daal_knn.compute(train_X, train_y)
+		end = time.time()
+
+		logger.info("Training time in sec = " + str(end - start))
+		# save the model
+		logger.info('Training complete.')
+		logger.info('Saving model results...')
+		with open(os.path.join(model_path, 'knn-model.pkl'), 'wb') as out:# give a unique name to this one
+			pickle.dump(result, out)
+		# savinf parameter
+		out_path = model_path+"/parameters.json"
+		with open(out_path, "w") as file:
+			file.write(json.dumps(params))
+		logger.info('Parameters saved at %s' % str(out_path))
+	except Exception as e:
+		# Write out an error file. This will be returned as the failureReason in the
+		# DescribeTrainingJob result.
+		trc = traceback.format_exc()
+		with open(os.path.join(output_path, 'failure'), 'w') as s:
+			s.write('Exception during training: ' + str(e) + '\n' + trc)
+		# Printing this causes the exception to be in the training job logs, as well.
+		print('Exception during training: ' + str(e) + '\n' + trc, file=sys.stderr)
+		# A non-zero exit code causes the training job to be marked as Failed.
+		sys.exit(255)
+
+if __name__ == "__main__":
+	train()
+	sys.exit(0)
