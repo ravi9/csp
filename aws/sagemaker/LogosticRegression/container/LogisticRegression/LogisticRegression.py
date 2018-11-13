@@ -7,7 +7,7 @@ import numpy as np
 class LogisticRegression:
 
     '''
-....Constructor to set Kmeans compute parameters
+....Constructor to set LogisticRegression compute parameters
 ....'''
 
     def __init__(
@@ -17,6 +17,7 @@ class LogisticRegression:
         penaltyL1=0,
         penaltyL2=0,
         interceptFlag=True,
+        resultsToCompute="computeClassesLabels",
         optSolverParam = {}
         ):
 
@@ -26,38 +27,40 @@ class LogisticRegression:
         self.penaltyL2 = penaltyL2
         self.interceptFlag = interceptFlag
         self.optSolverParam = optSolverParam
+        self.resultsToCompute = resultsToCompute
 
     def train(self, train_data, train_labels):
         #self.betaResult = self.result.get(classifier.training.model).getBeta()
+        dtype = (np.float64 if self.dtype == "double" else np.float32)
         optSolver = None
         #create a solver
         if self.optSolverParam['solverName'] == 'sgd':
-            lrs = np.array([[self.optSolverParam['solverLearningRate']]], dtype=np.double)
+            lrs = np.array([[self.optSolverParam['solverLearningRate']]], dtype=dtype)
             batchSize_ = int(self.optSolverParam['solverBatchSize'])
             method = self.optSolverParam["solverMethod"]
             if method == "defaultDense":
                 batchSize_ = 1
             optSolver = d4p.optimization_solver_sgd(function = None, learningRateSequence = lrs,
                                                     method = method,
-                                                    accuracyThreshold = float(self.optSolverParam['solverAccuracyThreshold']),
+                                                    accuracyThreshold = dtype(self.optSolverParam['solverAccuracyThreshold']),
                                                     nIterations = int(self.optSolverParam['solverMaxIterations']),
                                                     batchSize = batchSize_
                                                     )
         if self.optSolverParam['solverName'] == 'lbfgs':
-            sls = np.array([[self.optSolverParam['solverStepLength']]], dtype=np.double)
+            sls = np.array([[self.optSolverParam['solverStepLength']]], dtype=dtype)
             optSolver = d4p.optimization_solver_lbfgs(function = None,
                                                       stepLengthSequence=sls,
-                                                      accuracyThreshold = float(self.optSolverParam['solverAccuracyThreshold']),
+                                                      accuracyThreshold = dtype(self.optSolverParam['solverAccuracyThreshold']),
                                                       nIterations = int(self.optSolverParam['solverMaxIterations']),
                                                       batchSize = int(self.optSolverParam['solverBatchSize']),
                                                       correctionPairBatchSize = int(self.optSolverParam['solverCorrectionPairBatchSize']),
                                                       L = int(self.optSolverParam['L'])
                                                       )
         if self.optSolverParam['solverName'] == 'adagrad':
-            lr = np.array([[self.optSolverParam['solverLearningRate']]], dtype=np.double)
+            lr = np.array([[self.optSolverParam['solverLearningRate']]], dtype=dtype)
             optSolver = d4p.optimization_solver_adagrad(function = None,
                                                         learningRate=lr,
-                                                        accuracyThreshold = float(self.optSolverParam['solverAccuracyThreshold']),
+                                                        accuracyThreshold = dtype(self.optSolverParam['solverAccuracyThreshold']),
                                                         nIterations = int(self.optSolverParam['solverMaxIterations']),
                                                         batchSize = int(self.optSolverParam['solverBatchSize'])
                                                         )
@@ -77,8 +80,9 @@ class LogisticRegression:
         #self.probabilities = predictionResult.get(classifier.prediction.probabilities)
         #self.logProbabilities = predictionResult.get(classifier.prediction.logProbabilities)
         # set parameters and compute predictions
-        predict_alg = d4p.logistic_regression_prediction(nClasses=self.nClasses,
-                                                         resultsToCompute="computeClassesLabels")
+        predict_alg = d4p.logistic_regression_prediction(fptype = self.dtype, nClasses=self.nClasses,
+                                                         resultsToCompute = self.resultsToCompute)
         predict_result = predict_alg.compute(predict_data, model)
         self.prediction = predict_result.prediction
+        self.probabilities = predict_result.probabilities
         return self

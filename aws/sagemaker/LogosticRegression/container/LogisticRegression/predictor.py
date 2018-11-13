@@ -19,13 +19,13 @@ from LogisticRegression import LogisticRegression
 
 prefix = '/opt/ml/'
 model_path = os.path.join(prefix, 'model')
-
 # A singleton for holding the model. This simply loads the model and holds it.
 # It has a predict function that does a prediction based on the model and the input data.
 
 class ScoringService(object):
-    model = None                # Where we keep the model when it's loaded
-
+    model     = None             # Where we keep the model when it's loaded
+    nFeatures = 0
+    nClasses  = 0
     @classmethod
     def get_model(cls):
         """Get the model object for this instance, loading it if it's not already loaded."""
@@ -33,15 +33,19 @@ class ScoringService(object):
             with open(os.path.join(model_path, 'daal-log-reg-train-model.pkl'), 'rb') as inp:
                 cls.model = pickle.load(inp)
         return cls.model
-
     @classmethod
-    def predict(cls, input):
+    def get_num_classes_and_features(cls):
+        """Get number of class and features """
+        data_loaded = np.genfromtxt(os.path.join(model_path, 'daal-log-reg-train-features-classes.csv'), delimiter=",", dtype=float)
+        nClasses = data_loaded[0]
+        nFeatures = data_loaded[1]
+        return nClasses, nFeatures
+    @classmethod
+    def predict(cls, input, nClasses, dtype, resultsToCompute):
         """For the input, do the predictions and return them."""
         model = cls.get_model()
-        with open(os.path.join(model_path, 'daal-log-reg-train-classes.npy'), 'rb') as inp:
-            nClasses = np.load(inp, encoding='latin1')
-        logistic_regression = LogisticRegression(nClasses)
-        return logistic_regression.predict(predict_data=input, model=model).prediction
+        logistic_regression = LogisticRegression(nClasses=nClasses, dtype = dtype, resultsToCompute=resultsToCompute)
+        return logistic_regression.predict(predict_data=input, model=model)
 
 # The flask app for serving predictions
 app = flask.Flask(__name__)
@@ -53,7 +57,10 @@ def ping():
     health = ScoringService.get_model() is not None  # You can insert a health check here
 
     status = 200 if health else 404
-    return flask.Response(response='\n', status=status, mimetype='application/json')
+    if health != None:
+        return flask.Response(response='model is found\n', status=200, mimetype='application/json')
+    else:
+        return flask.Response(response='model is not found\n', status=404, mimetype='application/json')
 
 @app.route('/invocations', methods=['POST'])
 def transformation():
@@ -71,19 +78,19 @@ def transformation():
     else:
         return flask.Response(response='This predictor only supports CSV data', status=415, mimetype='text/plain')
 
+    nClasses, nFeatures = ScoringService.get_num_classes_and_features()
+
+    if data.shape[1] != nFeatures:
+        return flask.Response(response='Number of features is incorrect. %d is required\n' % nFeatures, status=415, mimetype='text/plain')
+    resultsToCompute = "computeClassesLabels|computeClassesProbabilities"
     print('Invoked with {} records'.format(data.shape[0]))
-    #raw_data = [ pd.read_csv(file, header=None) for file in input_files ]
-    #train_data = pd.concat(raw_data)
-        
-    #logger.info("Training Data Shape: " + str(train_data.shape))
-
+    
     # Do the prediction
-    predictions = ScoringService.predict(input=np.ascontiguousarray(data, dtype=np.float32))
+    predictions = ScoringService.predict(input=np.ascontiguousarray(data, dtype=np.double), nClasses=nClasses,
+                                         dtype="double", resultsToCompute=resultsToCompute)
+    prediction = "".join(str(x[0])+ ' ' for x in predictions.prediction)
+    probabilities = "".join(str(x)+ ' ' for x in predictions.probabilities)
 
-    # Convert from numpy back to CSV
-    out = StringIO()
-    #pd.DataFrame({'results':predictions}).to_csv(out, header=False, index=False)
-    #result = out.getvalue()
-    np.savetxt(out, predictions)
-    result = out.getvalue()
+    result = prediction + ';' + probabilities
+
     return flask.Response(response=result, status=200, mimetype='text/csv')
