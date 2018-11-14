@@ -1,5 +1,17 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
+# file: LogisticRegression.py
+#===============================================================================
+# Copyright 2014-2018 Intel Corporation.
+#
+# This software and the related documents are Intel copyrighted  materials,  and
+# your use of  them is  governed by the  express license  under which  they were
+# provided to you (License).  Unless the License provides otherwise, you may not
+# use, modify, copy, publish, distribute,  disclose or transmit this software or
+# the related documents without Intel's prior written permission.
+#
+# This software and the related documents  are provided as  is,  with no express
+# or implied  warranties,  other  than those  that are  expressly stated  in the
+# License.
+#===============================================================================
 
 import daal4py as d4p
 import numpy as np
@@ -30,7 +42,6 @@ class LogisticRegression:
         self.resultsToCompute = resultsToCompute
 
     def train(self, train_data, train_labels):
-        #self.betaResult = self.result.get(classifier.training.model).getBeta()
         dtype = (np.float64 if self.dtype == "double" else np.float32)
         optSolver = None
         #create a solver
@@ -54,7 +65,7 @@ class LogisticRegression:
                                                       nIterations = int(self.optSolverParam['solverMaxIterations']),
                                                       batchSize = int(self.optSolverParam['solverBatchSize']),
                                                       correctionPairBatchSize = int(self.optSolverParam['solverCorrectionPairBatchSize']),
-                                                      L = int(self.optSolverParam['L'])
+                                                      L = int(self.optSolverParam['solverL'])
                                                       )
         if self.optSolverParam['solverName'] == 'adagrad':
             lr = np.array([[self.optSolverParam['solverLearningRate']]], dtype=dtype)
@@ -64,7 +75,7 @@ class LogisticRegression:
                                                         nIterations = int(self.optSolverParam['solverMaxIterations']),
                                                         batchSize = int(self.optSolverParam['solverBatchSize'])
                                                         )
-            
+
         train_alg = d4p.logistic_regression_training(nClasses      = self.nClasses,
                                                      penaltyL1     = self.penaltyL1,
                                                      penaltyL2     = self.penaltyL2,
@@ -77,8 +88,6 @@ class LogisticRegression:
         return self
 
     def predict(self, predict_data, model):
-        #self.probabilities = predictionResult.get(classifier.prediction.probabilities)
-        #self.logProbabilities = predictionResult.get(classifier.prediction.logProbabilities)
         # set parameters and compute predictions
         predict_alg = d4p.logistic_regression_prediction(fptype = self.dtype, nClasses=self.nClasses,
                                                          resultsToCompute = self.resultsToCompute)

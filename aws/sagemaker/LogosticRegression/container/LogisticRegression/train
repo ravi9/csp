@@ -1,4 +1,17 @@
-#!/usr/bin/env python
+# file: train
+#===============================================================================
+# Copyright 2014-2018 Intel Corporation.
+#
+# This software and the related documents are Intel copyrighted  materials,  and
+# your use of  them is  governed by the  express license  under which  they were
+# provided to you (License).  Unless the License provides otherwise, you may not
+# use, modify, copy, publish, distribute,  disclose or transmit this software or
+# the related documents without Intel's prior written permission.
+#
+# This software and the related documents  are provided as  is,  with no express
+# or implied  warranties,  other  than those  that are  expressly stated  in the
+# License.
+#===============================================================================
 
 # A sample training component that trains a simple scikit-learn decision tree model.
 # This implementation works in File mode and makes no assumptions about the input file names.
@@ -144,13 +157,18 @@ def train():
         end = time.time()
         logger.info("Training time in sec = " + str(end - start))
 
-        result_buffer = np.zeros(2)
+        result_buffer = np.zeros(2,dtype=np.int)
         result_buffer[0] = nClasses
         result_buffer[1] = train_data.shape[1]
+        result_type = params['dtype']
         
         # save the model
         np.savetxt(os.path.join(model_path, 'daal-log-reg-train-features-classes.csv'), result_buffer, delimiter=",")
+        text_file = open(os.path.join(model_path, 'daal-log-reg-dtype.txt'), "w")
+        text_file.write(result_type)
+        text_file.close()
         logger.info('number of classes saved at ' + str(os.path.join(model_path, 'daal-log-reg-train-features-classes.csv')))
+        logger.info('dtype saved at ' + str(os.path.join(model_path, 'daal-log-reg-dtype.txt')))
         with open(os.path.join(model_path, 'daal-log-reg-train-model.pkl'), 'wb') as out_path:
             pickle.dump(logistic_regression.trainingResult.model, out_path)
             logger.info('Model saved at ' + str(out_path))
