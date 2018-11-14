@@ -91,6 +91,6 @@ def transformation():
     prediction = "".join(str(x[0])+ ' ' for x in predictions.prediction)
     probabilities = "".join(str(x)+ ' ' for x in predictions.probabilities)
 
-    result = prediction + ';' + probabilities
+    result = prediction + '\n\n' + probabilities
 
     return flask.Response(response=result, status=200, mimetype='text/csv')
