@@ -135,7 +135,7 @@ def train():
                                                  optSolverParam = solverParams
                                                 )
         dtype = (np.float64 if params['dtype'] == "double" else np.float32)
-        X = np.ascontiguousarray(train_data, dtype=dtype)
+        X = np.ascontiguousarray(train_data.values, dtype=dtype)
         train_data = np.ascontiguousarray(X[:,:-1], dtype=dtype)
         labels = np.ascontiguousarray(X[:,-1].reshape(len(X),1), dtype=dtype)
         

@@ -86,7 +86,7 @@ def transformation():
     print('Invoked with {} records'.format(data.shape[0]))
     
     # Do the prediction
-    predictions = ScoringService.predict(input=np.ascontiguousarray(data, dtype=np.double), nClasses=nClasses,
+    predictions = ScoringService.predict(input=np.ascontiguousarray(data.values, dtype=np.double), nClasses=nClasses,
                                          dtype="double", resultsToCompute=resultsToCompute)
     prediction = "".join(str(x[0])+ ' ' for x in predictions.prediction)
     probabilities = "".join(str(x)+ ' ' for x in predictions.probabilities)
