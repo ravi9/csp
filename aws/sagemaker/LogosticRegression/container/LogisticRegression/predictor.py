@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # file: predictor.py
 #===============================================================================
 # Copyright 2014-2018 Intel Corporation.

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # file: LogisticRegression.py
 #===============================================================================
 # Copyright 2014-2018 Intel Corporation.
